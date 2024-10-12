@@ -3,11 +3,11 @@ from tensorflow.keras import layers, models
 import os
 import re
 import fasttext
-from sklearn.model_selection import train_test_split
+import matplotlib.pyplot as plt
 import numpy as np
 
 # Hyperparameters
-sequence_length = 295 #--> average / #2618 longest
+sequence_length = 2618  #295 average / #2618 longest
 embedding_dim = 128
 rnn_units = 64
 k_value = 5
@@ -16,13 +16,18 @@ num_classes = 1
 
 # Function to build the BRNN-vdl neural network
 def build_vuldee_model(sequence_length, embedding_dim, rnn_units, k_value, num_classes):
+
     inputs = layers.Input(shape=(sequence_length, embedding_dim), name='input_layer')
 
     brnn = layers.Bidirectional(layers.LSTM(rnn_units, return_sequences=True), name='bidirectional_rnn')(inputs)
 
     dense = layers.Dense(rnn_units, activation='relu', name='dense_layer')(brnn)
 
-    activations = layers.Activation('relu', name='activation_layer')(dense)
+    dropout = layers.Dropout(0.5)(dense)
+
+    activations = layers.Activation('relu', name='activation_layer')(dropout)
+
+    #activations = layers.Activation('relu', name='activation_layer')(dense)
 
     vulnerability_location_matrix = layers.Input(shape=(sequence_length,), name='vulnerability_location_input')
 
@@ -63,7 +68,7 @@ def extract_labels(line):
     line_strip = line.strip().strip('[]')
     string_vector = line_strip.split(',')
     vector = [int(num) for num in string_vector]
-    return np.array(vector)
+    return vector
 
 
 def get_vulnerability_location_matrix(iSeVC, labels):
@@ -89,6 +94,7 @@ def get_vulnerability_location_matrix(iSeVC, labels):
         vuln_loc_matrix.extend(padding)
     else:
         vuln_loc_matrix = vuln_loc_matrix[:sequence_length]
+    print(np.array(vuln_loc_matrix).shape)
     return np.array(vuln_loc_matrix)
 
 
@@ -100,17 +106,61 @@ def vectorize_iSeVC(iSeVC):
             vectorized_iSeVC.append(vectorized_token)
     if len(vectorized_iSeVC) < sequence_length:
         padding_len = sequence_length - len(vectorized_iSeVC)
-        padding = [[0]*embedding_dim] * padding_len
+        padding = [[0] * embedding_dim] * padding_len
         vectorized_iSeVC.extend(padding)
     else:
         vectorized_iSeVC = vectorized_iSeVC[:sequence_length]
+    print(np.array(vectorized_iSeVC).shape)
     return np.array(vectorized_iSeVC)
 
 
-def get_iSeVCs_vulnLocMatrixes_labels(filepath):
-    iSeVCs = []
-    vulnLocMatrixes = []
-    labels = []
+#def get_iSeVCs_vulnLocMatrixes_labels(filepath):
+def fit_model_with(filepath):
+    with open(filepath, 'r') as file:
+        iSeVC = []
+        lines = file.readlines()
+        reading_llvm_code = False
+        all_histories = []
+        for i in range(len(lines)):
+            if i == len(lines) - 1:
+                return all_histories
+            line = lines[i]
+            next_line = lines[i + 1]
+            if line.strip() == "" and 'define' in next_line:
+                reading_llvm_code = True
+                continue
+            if line.strip() == "" and next_line.strip() == "":
+                labels_line = lines[i + 2]
+                extracted_labels = extract_labels(labels_line)
+                print(extracted_labels)
+                vulnLocMatrix = get_vulnerability_location_matrix(iSeVC, extracted_labels)
+                vulnLocMatrix = np.expand_dims(vulnLocMatrix, axis=0)
+                vectorized_iSeVC = vectorize_iSeVC(iSeVC)
+                vectorized_iSeVC = np.expand_dims(vectorized_iSeVC, axis=0)
+                label = np.array([])
+                if extracted_labels[0] == 0:
+                    # label = np.array([0] * sequence_length)
+                    label = np.array([0])
+                else:
+                    # label = np.array([1] * sequence_length)
+                    label = np.array([1])
+                #print(extracted_labels)
+                history = vuldee_model.fit([vectorized_iSeVC, vulnLocMatrix],
+                                           label,
+                                           epochs=10,
+                                           batch_size=1
+                                           )
+                all_histories.append(history.history)
+                reading_llvm_code = False
+                iSeVC = []
+                continue
+            if reading_llvm_code:
+                tokenized_line = tokenize_line(line)
+                print(tokenized_line)
+                iSeVC.append(tokenized_line)
+
+
+def evaluate_model_with(filepath):
     with open(filepath, 'r') as file:
         iSeVC = []
         lines = file.readlines()
@@ -126,24 +176,29 @@ def get_iSeVCs_vulnLocMatrixes_labels(filepath):
             if line.strip() == "" and next_line.strip() == "":
                 labels_line = lines[i + 2]
                 extracted_labels = extract_labels(labels_line)
-                print(extracted_labels)
-                #train_model(iSeVC, labels)
+                vulnLocMatrix = get_vulnerability_location_matrix(iSeVC, extracted_labels)
+                vulnLocMatrix = np.expand_dims(vulnLocMatrix, axis=0)
                 vectorized_iSeVC = vectorize_iSeVC(iSeVC)
-                iSeVCs.append(vectorized_iSeVC)
-                vulnLocMatrixes.append(get_vulnerability_location_matrix(iSeVC, extracted_labels))
+                vectorized_iSeVC = np.expand_dims(vectorized_iSeVC, axis=0)
+                label = np.array([])
                 if extracted_labels[0] == 0:
-                    labels.append(0)
+                    #label = np.array([0] * sequence_length)
+                    label = np.array([0])
                 else:
-                    labels.append(1)
+                    #label = np.array([1] * sequence_length)
+                    label = np.array([1])
+                test_loss, test_accuracy = vuldee_model.evaluate([vectorized_iSeVC, vulnLocMatrix],
+                                                                 label,
+                                                                 batch_size=1
+                                                                 )
+                print(f"Test Loss: {test_loss}")
+                print(f"Test Accuracy: {test_accuracy}")
                 reading_llvm_code = False
                 iSeVC = []
                 continue
             if reading_llvm_code:
                 tokenized_line = tokenize_line(line)
-                print(tokenized_line)
                 iSeVC.append(tokenized_line)
-    iSeVCs_vulnLocMatrixes_labels = {'iSeVCs': np.array(iSeVCs), 'vulnLocMatrixes': np.array(vulnLocMatrixes), 'labels': np.array(labels)}
-    return iSeVCs_vulnLocMatrixes_labels
 
 
 train_folder = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/iSeVCs_for_train_programs'
@@ -156,32 +211,17 @@ for i in range(len(os.listdir(train_folder))):
         filepath_train = os.path.join(train_folder, filename_train)
         filepath_test = os.path.join(test_folder, filename_test)
         print(f"Processing train file: {filepath_train}")
+        train_histories = fit_model_with(filepath_train)
+        for p, history in enumerate(train_histories):
+            plt.plot(history['accuracy'], label=f'ISEVC {p + 1} Accuracy')
+            plt.plot(history['loss'], label=f'ISEVC {p + 1} Loss')
+        plt.title('Training Accuracy and Loss for Each ISEVC')
+        plt.xlabel('Epochs')
+        plt.ylabel('Accuracy / Loss')
+        plt.legend()
+        plt.show()
+
         print(f"Processing test file: {filename_test}")
-        train_iSeVCs_vulnLocMatrixes_labels = get_iSeVCs_vulnLocMatrixes_labels(filepath_train)
-        iSeVCs = train_iSeVCs_vulnLocMatrixes_labels['iSeVCs']
-        vulnerability_location_matrixes = train_iSeVCs_vulnLocMatrixes_labels['vulnLocMatrixes']
-        labels = train_iSeVCs_vulnLocMatrixes_labels['labels']
-        print('shape iSeVCs --> ' + str(iSeVCs.shape))
-        print('shape vulnerability_location_matrixes --> ' + str(vulnerability_location_matrixes.shape))
-        print('shape labels --> ' + str(labels.shape))
-        iSeVCs_train, iSeVCs_val, vuln_loc_train, vuln_loc_val, labels_train, labels_val = train_test_split(
-            iSeVCs, vulnerability_location_matrixes, labels, test_size=0.2, random_state=42
-        )
-        exit()
-        vuldee_model.fit([iSeVCs_train, vuln_loc_train],
-                         labels_train,
-                         epochs=10,
-                         batch_size=32,
-                         validation_data=([iSeVCs_val, vuln_loc_val], labels_val)
-                         )
-
-        test_iSeVCs_vulnLocMatrixes_labels = get_iSeVCs_vulnLocMatrixes_labels(filepath_test)
-        test_loss, test_accuracy = vuldee_model.evaluate([test_iSeVCs_vulnLocMatrixes_labels['iSeVCs'],
-                                                          test_iSeVCs_vulnLocMatrixes_labels['vulnLocMatrixes']],
-                                                         test_iSeVCs_vulnLocMatrixes_labels['labels'],
-                                                         batch_size=32)
-
-        print(f"Test Loss: {test_loss}")
-        print(f"Test Accuracy: {test_accuracy}")
+        evaluate_model_with(filepath_test)
 
 vuldee_model.save('/home/httpiego/PycharmProjects/VulDeeDiegator/trained_model.h5')
