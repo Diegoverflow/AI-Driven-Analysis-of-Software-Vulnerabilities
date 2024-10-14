@@ -2,6 +2,7 @@ import numpy as np
 import re
 import fasttext
 import gc
+import os
 
 sequence_length = 2618  #295 average / #2618 longest
 
@@ -68,34 +69,46 @@ def vectorize_iSeVC(iSeVC):
     return np.array(vectorized_iSeVC)
 
 
-#filepath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/iSeVCs_for_train_programs/PD_slices.txt'
+filepath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/iSeVCs_for_train_programs/PD_slices.txt'
 
-filepath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/iSeVCs_for_target_programs/AE_slices.txt'
+#filepath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/iSeVCs_for_target_programs/PD_slices.txt'
 
-#outputpath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/Training/PD_slices/'
+outputpath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/Training/PD_slices/'
 
-outputpath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/Testing/AE_slices/'
+#outputpath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/Testing/PD_slices/'
 
 with open(filepath, 'r') as file:
+    print('Running')
     iSeVC = []
-    lines = file.readlines()
+    line = file.readline()
     reading_llvm_code = False
     iSeVC_counter = 0
-    for i in range(len(lines)):
-        if i == len(lines) - 1:
-            break
-        line = lines[i]
-        next_line = lines[i + 1]
+    while line:
+        pos = file.tell()
+        next_line = file.readline()
+        file.seek(pos)
         if line.strip() == "" and 'define' in next_line:
             reading_llvm_code = True
+            line = file.readline()
             continue
         if line.strip() == "" and next_line.strip() == "":
-            labels_line = lines[i + 2]
-            extracted_labels = extract_labels(labels_line)
+            if os.path.isfile(outputpath+f'{iSeVC_counter}.npz'):
+                print('file '+f'{iSeVC_counter}.npz'+' exists\n\n\n\n\n')
+                line = file.readline()
+                iSeVC_counter += 1
+                reading_llvm_code = False
+                continue
+            file.readline()
+            labels_line = file.readline()
+            if labels_line.strip() == "":
+                break
+            extracted_labels = extract_labels(labels_line.strip())
             #print(extracted_labels)
             vulnLocMatrix = get_vulnerability_location_matrix(iSeVC, extracted_labels)
             vulnLocMatrix = np.expand_dims(vulnLocMatrix, axis=0)
             vectorized_iSeVC = vectorize_iSeVC(iSeVC)
+            iSeVC = []
+            gc.collect()
             vectorized_iSeVC = np.expand_dims(vectorized_iSeVC, axis=0)
             label = np.array([])
             if extracted_labels[0] == 0:
@@ -110,12 +123,22 @@ with open(filepath, 'r') as file:
                      label=label)
             reading_llvm_code = False
             #print(iSeVC)
-            iSeVC = []
-            gc.collect()
-            print(iSeVC_counter)
+            del vulnLocMatrix
+            del vectorized_iSeVC
+            del label
+            print('added ' + f'{iSeVC_counter}'+'.npz')
             iSeVC_counter += 1
+            line = file.readline()
             continue
         if reading_llvm_code:
-            tokenized_line = tokenize_line(line)
+            if os.path.isfile(outputpath+f'{iSeVC_counter}.npz'):
+                line = file.readline()
+                continue
+            tokenized_line = tokenize_line(line.strip())
             #print(tokenized_line)
             iSeVC.append(tokenized_line)
+            line = file.readline()
+            continue
+        line = file.readline()
+
+print('ho finito')
