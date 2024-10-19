@@ -1,52 +1,28 @@
+import numpy as np
 import os
-import re
 
-#train_folder = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/iSeVCs_for_train_programs'
-train_folder = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/iSeVCs_for_target_programs'
+file_path = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/Training/PD_slices/'
 
-TOKEN_PATTERN = r'[@%]?\w+\*+|\w+|[\[\]{}(),=*]|[<>]|[0-9]+|#\d+'
+# Try loading the file
+flag = True
+start = 0
+while flag:
+    try:
+        for i in range(start, 40993):
+            file = file_path + f'{i}.npz'
+            if not os.path.exists(file):
+                continue
+            data = np.load(file, allow_pickle=True)
+            if i == 40992:
+                print('finito')
+                flag = False
+            #print(f"Keys in the file: {data.files}")  # Prints the names of arrays in the .npz file
+            #for key in data.files:
+                #print(f"Array '{key}': {data[key].shape}")  # Prints the shape of each array
+    except Exception as e:
+        os.remove(file)
+        start = i+1
+        print(f"Removing file: {i}")
 
-def tokenize_line(llvm_code):
-    line_tokens = re.findall(TOKEN_PATTERN, llvm_code)
-    return line_tokens
+print('todo bien')
 
-record = 0
-num_of_isevcs = 0
-tot_tokens = 0
-for i in range(len(os.listdir(train_folder))):
-    filename_train = os.listdir(train_folder)[i]
-    if filename_train.endswith(".txt"):
-        filepath_train = os.path.join(train_folder, filename_train)
-        with open(filepath_train, 'r') as file:
-            iSeVC = []
-            lines = file.readlines()
-            reading_llvm_code = False
-            for i in range(len(lines)):
-                if i == len(lines) - 1:
-                    break
-                line = lines[i]
-                next_line = lines[i + 1]
-                if line.strip() == "" and 'define' in next_line:
-                    reading_llvm_code = True
-                    continue
-                if line.strip() == "" and next_line.strip() == "":
-                    labels_line = lines[i + 2]
-                    reading_llvm_code = False
-                    tokens_iSeVC = 0
-                    for line in iSeVC:
-                        tokens_iSeVC += len(line)
-                    tot_tokens += tokens_iSeVC
-                    if tokens_iSeVC > record:
-                        record = tokens_iSeVC
-                        print(record)
-                    iSeVC = []
-                    num_of_isevcs += 1
-                    continue
-                if reading_llvm_code:
-                    tokenized_line = tokenize_line(line)
-                    iSeVC.append(tokenized_line)
-
-print('avarege tokens -> ' + str(tot_tokens/num_of_isevcs))
-print('num of isevcs --> ' + str(num_of_isevcs))
-print('longest isevc -> ' + str(record))
-#296
