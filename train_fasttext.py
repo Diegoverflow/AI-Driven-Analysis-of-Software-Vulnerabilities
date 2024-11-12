@@ -58,11 +58,13 @@ tokenized_corpus_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs_tr
 process_and_tokenize_files(main_folder, tokenized_corpus_file)
 
 
-model = fasttext.train_unsupervised(tokenized_corpus_file, model='skipgram', dim=64)
+model = fasttext.train_unsupervised(tokenized_corpus_file, model='skipgram', dim=64, lr=0.005, epoch=100)
 #model = fasttext.train_unsupervised(tokenized_corpus_file, model='skipgram', dim=128, lr=0.025, epoch=10)
 
 
-model.save_model('/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs_training_fasttext/fasttext_llvm_model.bin')
+model.save_model('/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs_training_fasttext/fasttext_llvm_model_64.bin')
+
+#m = fasttext.load_model('/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs_training_fasttext/fasttext_llvm_model_32.bin')
 
 
 vector_alloca = model.get_word_vector('alloca')

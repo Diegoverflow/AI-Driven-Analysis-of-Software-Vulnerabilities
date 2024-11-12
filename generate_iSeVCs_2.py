@@ -2,6 +2,7 @@ import subprocess
 import re
 import pickle
 
+
 def create_path(path):
     clang_command = ['mkdir', path]
 
@@ -275,43 +276,60 @@ def fix_variables(iSeVC, starting_variable):
 
 def main():
 
-    #foreach candidate in sSyVCs
-    criteria = 'inner_function'
-    c_source_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/source.c'
+    sSyVCs_path = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/sSyVCs'
 
-    path = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/' + criteria
+    with open(sSyVCs_path, 'rb') as f:
+        sSyVCs_dict = pickle.load(f)
 
-    create_path(path)
+    funcs = sSyVCs_dict["funcs"]
+    others = sSyVCs_dict["others"]
 
-    llvm_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/prova'
-    generate_llvm = ['clang', '-S', '-emit-llvm', c_source_file, '-o', llvm_file]
-    subprocess.run(generate_llvm, check=True)
+    sSyVCs = []
 
-    with open(llvm_file, 'r') as llvm:
-        llvm_content = llvm.readlines()
+    sSyVCs.extend(funcs)
+    sSyVCs.extend(others)
 
-    program_slice = slice(c_source_file, path, criteria)
+    for sSyVC in sSyVCs:
 
-    with open(program_slice, 'r') as ps:
-        program_slice_content = ps.readlines()
+        #foreach candidate in sSyVCs
+        criteria = sSyVC
+        c_source_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/source.c'
 
-    iSeVC = append_functions(llvm_content, program_slice_content, list())
+        path = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source' + criteria
 
-    for line in iSeVC:
-        print(str(line))
+        create_path(path)
 
-    print('_____________________________________________________________________________________')
+        llvm_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/prova'
+        generate_llvm = ['clang', '-S', '-emit-llvm', c_source_file, '-o', llvm_file]
+        subprocess.run(generate_llvm, check=True)
 
-    starting_variable = find_max_var(program_slice_content)
+        with open(llvm_file, 'r') as llvm:
+            llvm_content = llvm.readlines()
 
-    final_iSeVC = fix_variables(iSeVC, starting_variable)
+        program_slice = slice(c_source_file, path, criteria)
 
-    for line in final_iSeVC:
-        print(str(line))
+        with open(program_slice, 'r') as ps:
+            program_slice_content = ps.readlines()
 
-    file_path = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/iSeVC'
+        iSeVC = append_functions(llvm_content, program_slice_content, list())
 
+        for line in iSeVC:
+            print(str(line))
 
+        print('_____________________________________________________________________________________')
+
+        starting_variable = find_max_var(program_slice_content)
+
+        final_iSeVC = fix_variables(iSeVC, starting_variable)
+
+        for line in final_iSeVC:
+            print(str(line))
+
+        save = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/iSeVC'
+
+        with open(save, 'w') as file:
+            for line in file:
+                file.write(line) #+ '\n')
 
 if __name__ == "__main__":
     main()

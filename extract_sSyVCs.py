@@ -1,4 +1,5 @@
 import clang.cindex
+import pickle
 
 DANGEROUS_FUNCS = ["func", "printf", "inner_function"] #strcpy
 
@@ -85,21 +86,22 @@ def main(file_path):
     """Main function to parse the file and traverse the AST."""
     translation_unit = parse_source_file(file_path)
     root_node = translation_unit.cursor
-    sSyVCs = []
-    sSyVCs_dict = dict()
-    sSyVCs_dict["funcs"] = []
-    sSyVCs_dict["others"] = []
-    traverse_ast(root_node, sSyVCs_dict)
-    print(sSyVCs)
-    sSyVCs_funcs = sSyVCs_dict["funcs"]
+    sSyVCs = dict()
+    sSyVCs["funcs"] = []
+    sSyVCs["others"] = []
+    traverse_ast(root_node, sSyVCs)
+    sSyVCs_funcs = sSyVCs["funcs"]
     print("FUNCS")
     print(sSyVCs_funcs.__str__())
-    sSyVCs_others = sSyVCs_dict["others"]
+    sSyVCs_others = sSyVCs["others"]
     print("OTHERS")
     for tuple in sSyVCs_others:
         print(str(tuple))
+    file_path = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/sSyVCs'
+    with open(file_path, 'wb') as f:
+        pickle.dump(sSyVCs, f)
 
 
 if __name__ == "__main__":
-    source_file = "/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source.c"
+    source_file = "/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/source.c"
     main(source_file)

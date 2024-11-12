@@ -11,7 +11,7 @@ embedding_dim = 64
 TOKEN_PATTERN = r'[@%]?\w+\*+|\w+|[\[\]{}(),=*]|[<>]|[0-9]+|#\d+'
 
 fasttext = fasttext.load_model(
-    '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs_training_fasttext/fasttext_llvm_model.bin')
+    '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs_training_fasttext/fasttext_llvm_model_64.bin')
 
 
 def tokenize_line(llvm_code):
@@ -73,7 +73,7 @@ filepath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/iSeVCs_for_trai
 
 #filepath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/iSeVCs_for_target_programs/PD_slices.txt'
 
-outputpath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/Training/PD_slices/'
+outputpath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/Training/'
 
 #outputpath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/Testing/PD_slices/'
 
@@ -82,7 +82,7 @@ with open(filepath, 'r') as file:
     iSeVC = []
     line = file.readline()
     reading_llvm_code = False
-    iSeVC_counter = 0
+    iSeVC_counter = 85406
     while line:
         pos = file.tell()
         next_line = file.readline()
@@ -93,7 +93,7 @@ with open(filepath, 'r') as file:
             continue
         if line.strip() == "" and next_line.strip() == "":
             if os.path.isfile(outputpath+f'{iSeVC_counter}.npz'):
-                print('file '+f'{iSeVC_counter}.npz'+' exists\n\n\n\n\n')
+                print('file '+f'{iSeVC_counter}.npz'+' exists\n')
                 line = file.readline()
                 iSeVC_counter += 1
                 reading_llvm_code = False
@@ -117,16 +117,16 @@ with open(filepath, 'r') as file:
             else:
                 # label = np.array([1] * sequence_length)
                 label = np.array([1])
-            np.savez(outputpath + f'{iSeVC_counter}.npz',
-                     iSeVC=vectorized_iSeVC,
-                     vulnLocMatrix=vulnLocMatrix,
-                     label=label)
+            np.savez_compressed(outputpath + f'{iSeVC_counter}.npz',
+                                iSeVC=vectorized_iSeVC,
+                                vulnLocMatrix=vulnLocMatrix,
+                                label=label)
             reading_llvm_code = False
             #print(iSeVC)
             del vulnLocMatrix
             del vectorized_iSeVC
             del label
-            print('added ' + f'{iSeVC_counter}'+'.npz')
+            print('added ' + f'{iSeVC_counter}'+'.npz\n')
             iSeVC_counter += 1
             line = file.readline()
             continue
@@ -140,5 +140,6 @@ with open(filepath, 'r') as file:
             line = file.readline()
             continue
         line = file.readline()
+    print(f'next from --> {iSeVC_counter}')
 
 print('ho finito')
