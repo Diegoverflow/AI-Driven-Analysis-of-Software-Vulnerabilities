@@ -1,7 +1,7 @@
 import gc
 
 import tensorflow as tf
-from tensorflow.keras.optimizers import Adamax
+from tensorflow.keras.optimizers import Adam
 from keras.api.callbacks import ReduceLROnPlateau
 from tensorflow.keras import regularizers
 from tensorflow.keras.layers import BatchNormalization
@@ -12,70 +12,101 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 
-gpus = tf.config.list_physical_devices('GPU')
-if gpus:
-    try:
-        for gpu in gpus:
-            tf.config.experimental.set_memory_growth(gpu, True)
-        print(f"Using GPU: {gpus}")
-    except RuntimeError as e:
-        print(e)
-else:
-    print("No GPU detected.")
-
 # Hyperparameters
-sequence_length = 2618
-embedding_dim = 32
-hidden_nodes = 125 #900
-hidden_layers = 1
-output_dim = 512
-k_value = 1  # k = 1 as per the paper
+sequence_length = 2618  #295 average / #2618 longest
+embedding_dim = 64
+rnn_units = 32
+k_value = 5
 num_classes = 1
-batch_size = 128 #16
-learning_rate = 0.002
-dropout_rate = 0.4
-epochs = 10
+batch_size = 128  # 500
 
-# Function to build the BRNN-vdl neural network
+cnn_filters = 128
+kernel_size = 3
+rhn_units = 32 ###########
+depth = 3  # Number of RHN layers
 
-def build_vuldee_model(sequence_length, embedding_dim, hidden_nodes, hidden_layers, k_value, num_classes, dropout_rate):
 
+def build_hybrid_cnn_rhn_model(sequence_length, embedding_dim, cnn_filters, kernel_size, rhn_units, depth, k_value, num_classes):
+    # Input layer
     inputs = layers.Input(shape=(sequence_length, embedding_dim), name='input_layer')
 
-    x = inputs
-    for i in range(hidden_layers):
-        x = layers.Bidirectional(
-            layers.LSTM(hidden_nodes, return_sequences=True, kernel_regularizer=regularizers.l2(0.01),
-                        recurrent_regularizer=regularizers.l2(0.01)),
-            name=f'bidirectional_rnn_layer_{i + 1}')(x)
+    # Convolutional layer
+    cnn_output = layers.Conv1D(
+        filters=cnn_filters, kernel_size=kernel_size, activation='relu',
+        padding='same', kernel_regularizer=regularizers.l2(0.01),
+        name='cnn_layer')(inputs)
 
-    dense = layers.Dense(hidden_nodes, activation='relu', kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01), name='dense_layer')(x)
-    dropout = layers.Dropout(dropout_rate, name='dropout_layer')(dense)
-    batch_norm = BatchNormalization(name='batch_normalization_layer')(dropout)
-    activations = layers.Activation('relu', name='activation_layer')(batch_norm)
+    # Max pooling to reduce sequence length
+    pooled_output = layers.MaxPooling1D(pool_size=2, name='max_pooling_layer')(cnn_output)
 
+    # Projection layer to match RHN input size
+    projected_output = layers.Dense(rhn_units, activation='relu', name='projection_layer')(pooled_output)
+
+    # Recurrent Highway Network
+    h = projected_output
+    for i in range(depth):
+        transform_gate = layers.Dense(
+            rhn_units, activation='sigmoid', name=f'transform_gate_{i}',
+            kernel_regularizer=regularizers.l2(0.01))(h)
+        carry_gate = layers.Lambda(lambda x: 1.0 - x, name=f'carry_gate_{i}')(transform_gate)
+
+        highway_h = layers.Dense(
+            rhn_units, activation='relu', name=f'highway_dense_{i}',
+            kernel_regularizer=regularizers.l2(0.01))(h)
+
+        h = layers.Add(name=f'highway_add_{i}')([
+            layers.Multiply(name=f'transform_gate_apply_{i}')([transform_gate, highway_h]),
+            layers.Multiply(name=f'carry_gate_apply_{i}')([carry_gate, h])
+        ])
+
+    # Dense layer after RHN
+    dense = layers.Dense(
+        rhn_units, activation='relu',
+        kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01),
+        name='dense_layer')(h)
+
+    # Dropout for regularization
+    dropout = layers.Dropout(0.5, name='dropout_layer')(dense)
+
+    # Vulnerability location matrix processing
     vulnerability_location_matrix = layers.Input(shape=(sequence_length,), name='vulnerability_location_input')
-    expanded_vulnerability_location_matrix = layers.Lambda(lambda x: tf.expand_dims(x, -1))(
-        vulnerability_location_matrix)
+    expanded_vulnerability_location_matrix = layers.Lambda(lambda x: tf.expand_dims(x, -1), name='expand_dims')(vulnerability_location_matrix)
 
-    multiply = layers.Multiply(name='multiply_layer')([activations, expanded_vulnerability_location_matrix])
+    # Align sequence length of vulnerability location matrix with the dropout output
+    aligned_vulnerability_location_matrix = layers.Lambda(
+        lambda x: tf.image.resize(x, [tf.shape(dropout)[1], 1]),
+        name='resize_vulnerability_location')(expanded_vulnerability_location_matrix)
+
+    # Perform element-wise multiplication
+    multiply = layers.Multiply(name='multiply_layer')([dropout, aligned_vulnerability_location_matrix])
+
+    # k-max pooling
     k_max_values = layers.Lambda(lambda x: tf.math.top_k(x, k=k_value).values, name='k_max_pooling')(multiply)
 
+    # Average pooling
     average_pooling = layers.GlobalAveragePooling1D(name='average_pooling_layer')(k_max_values)
-    reduction = layers.Dense(output_dim, activation='relu', name='reduction_layer')(average_pooling)
-    output = layers.Dense(num_classes, activation='sigmoid', name='output_layer')(reduction)
 
-    model = models.Model(inputs=[inputs, vulnerability_location_matrix], outputs=output, name='VulDeeLocator_NN')
+    # Output layer
+    output = layers.Dense(num_classes, activation='sigmoid', name='output_layer')(average_pooling)
+
+    # Create the model
+    model = models.Model(inputs=[inputs, vulnerability_location_matrix], outputs=output, name='Hybrid_CNN_RHN')
+
     return model
 
 
-vuldee_model = build_vuldee_model(sequence_length, embedding_dim, hidden_nodes, hidden_layers, k_value, num_classes, dropout_rate)
-vuldee_model.compile(optimizer=Adamax(learning_rate=learning_rate), loss='binary_crossentropy', metrics=['accuracy'])
+vuldee_model =  build_hybrid_cnn_rhn_model(sequence_length, embedding_dim, cnn_filters, kernel_size, rhn_units, depth, k_value, num_classes)
+
+
+#vuldee_model.compile(optimizer=Adam(learning_rate=0.001, clipnorm=1.0), loss='binary_crossentropy', metrics=['accuracy'])
+vuldee_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+
+
 vuldee_model.summary()
 
 
-train_folder = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/' + str(embedding_dim) + '/Training/'
-test_folder = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/' + str(embedding_dim) + '/Testing/'
+train_folder = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/Training/'
+test_folder = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/Testing/'
 
 
 def plot(all_losses, all_accuracies,  all_test_losses, all_test_accuracies, train_num, plot_num):
@@ -163,8 +194,11 @@ def create_batch_test(file_list):
 
     return iSeVCs, vulnLocMatrixes, labels
 
-early_stopping = EarlyStopping(monitor='val_loss', patience=5, restore_best_weights=True)
+early_stopping = EarlyStopping(monitor='val_loss',
+                               patience=5, # 8 with reduce_lr #5 without
+                               restore_best_weights=True)
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=3, min_lr=1e-7)
+
 
 train_files_lenght = len(os.listdir(train_folder))
 train_files = os.listdir(train_folder)
@@ -182,7 +216,7 @@ if not os.path.exists(newpath):
 
 #TRAIN
 
-for i in range(epochs):
+for i in range(10):
     all_losses = []
     all_accuracies = []
     start_index = 0

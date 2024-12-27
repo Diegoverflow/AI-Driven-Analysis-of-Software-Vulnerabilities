@@ -37,11 +37,11 @@ def clean(input_file, output_file, function_name):
 
 
 def slice(c_source_file, path, criteria):
-    output_llvm_file = path + '/llvm.bc'
+    output_llvm_file = path + '/' + criteria + '_llvm.bc'
     generate_llvm = ['clang', '-g', '-S', '-emit-llvm', c_source_file, '-o', output_llvm_file]
     #generate_llvm = ['clang', '-g', '-c', '-emit-llvm', c_source_file, '-o', output_ir_file]
 
-    sliced_file = path + '/example.sliced'
+    sliced_file = path + '/' + criteria + '.sliced'
     #slice_llvm = ['/home/httpiego/dg/tools/llvm-slicer', '--preserve-dbg=false', '-c', '11:my_array', ir_file, '-o', sliced_file]
     slice_llvm = ['/home/httpiego/dg/tools/llvm-slicer',
                   '--forward',
@@ -49,7 +49,7 @@ def slice(c_source_file, path, criteria):
                   '-c', criteria,
                   output_llvm_file, '-o', sliced_file]
 
-    sliced_file_no_dbg = path + '/no_dbg.sliced'
+    sliced_file_no_dbg = path + '/' + criteria + '_no_dbg.sliced'
     delete_dbg_info = ['opt',
                        '--strip-debug',
                        '--strip-named-metadata',
@@ -57,15 +57,15 @@ def slice(c_source_file, path, criteria):
                        sliced_file,
                        '-o', sliced_file_no_dbg]
 
-    readable_no_dbg = path + '/no_dbg.readable'
+    readable_no_dbg = path + '/' + criteria + '_no_dbg.readable'
     convert_no_dbg_2readable = ['llvm-dis', sliced_file_no_dbg, '-o', readable_no_dbg]
 
     #delete_dbg = ['llvm-strip', readable_sliced, '-o', sliced_file_no_dbg]
 
-    readable_2c = path + '/sliced.c'
+    readable_2c = path + '/' + criteria + '_sliced.c'
     convert_readable_2c = ['/home/httpiego/llvm2c/build/llvm2c', readable_no_dbg, '-o', readable_2c]
 
-    cleaned_readable = path + '/cleaned.readable'
+    cleaned_readable = path + '/' + criteria + '_cleaned.readable'
 
     try:
         # Run the clang command
@@ -196,7 +196,7 @@ def fix_variables(iSeVC, starting_variable):
     i = 0
     while i < len(iSeVC):
         line = iSeVC[i]
-        if ':' in line:
+        if ':' in line and vars_dict_in_use != -1:
             for j in range(len(line)):
                 if line[j] == ':':
                         loop_variable = ''
@@ -276,14 +276,14 @@ def fix_variables(iSeVC, starting_variable):
 def main():
 
     #foreach candidate in sSyVCs
-    criteria = 'inner_function'
-    c_source_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/source.c'
+    criteria = 'strcpy'
+    c_source_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/bof/bof.c'
 
-    path = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/' + criteria
+    path = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/bof/' + criteria
 
     create_path(path)
 
-    llvm_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/prova'
+    llvm_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/bof/' + criteria + '_llvm'
     generate_llvm = ['clang', '-S', '-emit-llvm', c_source_file, '-o', llvm_file]
     subprocess.run(generate_llvm, check=True)
 
@@ -309,8 +309,13 @@ def main():
     for line in final_iSeVC:
         print(str(line))
 
-    file_path = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/iSeVC'
+    iSeVC_path = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/bof/' + criteria + '/iSeVC'
 
+    create_path(iSeVC_path)
+
+    with open(iSeVC_path + '/bof' + '_' + criteria + '_' + '_iSeVC', "w") as iSeVC:
+        for line in final_iSeVC:
+            iSeVC.write(line.lstrip())
 
 
 if __name__ == "__main__":

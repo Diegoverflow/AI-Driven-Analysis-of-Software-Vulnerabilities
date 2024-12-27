@@ -20,59 +20,68 @@ k_value = 5
 num_classes = 1
 batch_size = 128  # 500
 
+rhn_units = 32  # Number of recurrent highway units
+depth = 3  # Depth of the highway network (number of recurrent transformations)
 
 # Function to build the BRNN-vdl neural network
-def build_vuldee_model(sequence_length, embedding_dim, rnn_units, k_value, num_classes):
 
+def build_vuldee_rhn_model(sequence_length, embedding_dim, rhn_units, depth, k_value, num_classes):
+    # Input layer
     inputs = layers.Input(shape=(sequence_length, embedding_dim), name='input_layer')
 
-    #brnn = layers.Bidirectional(layers.LSTM(rnn_units, return_sequences=True), name='bidirectional_rnn')(inputs)
-    gru = layers.Bidirectional(layers.GRU(rnn_units,
-                                          return_sequences=True,
-                                          kernel_regularizer=regularizers.l2(0.01),
-                                          recurrent_regularizer=regularizers.l2(0.01),),
-                               name='bidirectional_rnn')(inputs)
+    # Initialize hidden state
+    h = layers.Dense(rhn_units, activation='relu', name='initial_dense')(inputs)
 
-    dense = layers.Dense(rnn_units,
-                         kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01),
-                         activation='relu', name='dense_layer')(gru)
+    # Recurrent Highway Network loop
+    for i in range(depth):
+        transform_gate = layers.Dense(
+            rhn_units, activation='sigmoid', name=f'transform_gate_{i}',
+            kernel_regularizer=regularizers.l2(0.01))(h)
+        carry_gate = layers.Lambda(lambda x: 1.0 - x, name=f'carry_gate_{i}')(transform_gate)
 
-    #dense = layers.Dense(rnn_units, kernel_regularizer=regularizers.l2(0.001), activation='relu', name='dense_layer')(gru)
+        highway_h = layers.Dense(
+            rhn_units, activation='relu', name=f'highway_dense_{i}',
+            kernel_regularizer=regularizers.l2(0.01))(h)
 
-    dropout = layers.Dropout(0.5)(dense) #
+        h = layers.Add(name=f'highway_add_{i}')([
+            layers.Multiply(name=f'transform_gate_apply_{i}')([transform_gate, highway_h]),
+            layers.Multiply(name=f'carry_gate_apply_{i}')([carry_gate, h])
+        ])
 
-    batch = BatchNormalization()(dropout)  #
+    # Dense layer after RHN
+    dense = layers.Dense(
+        rhn_units, activation='relu',
+        kernel_regularizer=regularizers.l1_l2(l1=0.01, l2=0.01),
+        name='dense_layer')(h)
 
-    activations = layers.Activation('relu', name='activation_layer')(batch)  #
+    # Dropout for regularization
+    dropout = layers.Dropout(0.5, name='dropout_layer')(dense)
 
-    #activations = layers.Activation('relu', name='activation_layer')(dense)
-
+    # Vulnerability location processing
     vulnerability_location_matrix = layers.Input(shape=(sequence_length,), name='vulnerability_location_input')
+    expanded_vulnerability_location_matrix = layers.Lambda(lambda x: tf.expand_dims(x, -1), name='expand_dims')(vulnerability_location_matrix)
+    multiply = layers.Multiply(name='multiply_layer')([dropout, expanded_vulnerability_location_matrix])
 
-    expanded_vulnerability_location_matrix = layers.Lambda(lambda x: tf.expand_dims(x, -1))(
-        vulnerability_location_matrix)
-
-    multiply = layers.Multiply(name='multiply_layer')([activations, expanded_vulnerability_location_matrix])
-
+    # k-max pooling
     k_max_values = layers.Lambda(lambda x: tf.math.top_k(x, k=k_value).values, name='k_max_pooling')(multiply)
 
+    # Average pooling
     average_pooling = layers.GlobalAveragePooling1D(name='average_pooling_layer')(k_max_values)
 
+    # Output layer
     output = layers.Dense(num_classes, activation='sigmoid', name='output_layer')(average_pooling)
 
-    model = models.Model(inputs=[inputs, vulnerability_location_matrix], outputs=output, name='VulDeeLocator_NN')
+    # Create the model
+    model = models.Model(inputs=[inputs, vulnerability_location_matrix], outputs=output, name='VulDeeLocator_RHN')
 
     return model
 
 
-vuldee_model = build_vuldee_model(sequence_length, embedding_dim, rnn_units, k_value, num_classes)
+vuldee_rhn_model = build_vuldee_rhn_model(sequence_length, embedding_dim, rhn_units, depth, k_value, num_classes)
 
-#vuldee_model.compile(optimizer=Adam(learning_rate=0.001, clipnorm=1.0), loss='binary_crossentropy', metrics=['accuracy'])
-vuldee_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
+vuldee_rhn_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['accuracy'])
 
-
-vuldee_model.summary()
-
+vuldee_rhn_model.summary()
 
 train_folder = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/Training/'
 test_folder = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/Testing/'
@@ -101,7 +110,7 @@ def plot(all_losses, all_accuracies,  all_test_losses, all_test_accuracies, trai
 
     plt.tight_layout()
 
-    plt.savefig(f'/home/httpiego/PycharmProjects/VulDeeDiegator/trained_models/1/training_progress_{plot_num}.png')
+    plt.savefig(f'/home/httpiego/PycharmProjects/VulDeeDiegator/trained_models/{train_num}/training_progress_{plot_num}.png')
 
 def load_data_train(file_name):
     data = np.load(train_folder + file_name, allow_pickle=True)
@@ -168,17 +177,14 @@ early_stopping = EarlyStopping(monitor='val_loss',
                                restore_best_weights=True)
 reduce_lr = ReduceLROnPlateau(monitor='val_loss', factor=0.1, patience=3, min_lr=1e-7)
 
-all_losses = []
-all_accuracies = []
-
-#TRAIN
 
 train_files_lenght = len(os.listdir(train_folder))
-print('ciaooo ' + str(train_files_lenght))
 train_files = os.listdir(train_folder)
 random.shuffle(train_files)
-start_index = 0
-last_index = batch_size
+
+test_files_lenght = len(os.listdir(test_folder))
+test_files = os.listdir(test_folder)
+random.shuffle(test_files)
 
 train_num = 1
 
@@ -186,8 +192,13 @@ newpath = f'/home/httpiego/PycharmProjects/VulDeeDiegator/trained_models/{train_
 if not os.path.exists(newpath):
     os.makedirs(newpath)
 
-check = True
-for i in range(100):
+#TRAIN
+
+for i in range(10):
+    all_losses = []
+    all_accuracies = []
+    start_index = 0
+    last_index = batch_size
     while True:
         if start_index == train_files_lenght:
             check = False
@@ -202,7 +213,7 @@ for i in range(100):
         tf.keras.backend.clear_session()
         print(f'start index - {start_index}')
         print(f'last index - {last_index}')
-        history = vuldee_model.fit([iSeVCs, vulnLocMatrixes], labels,
+        history = vuldee_rhn_model.fit([iSeVCs, vulnLocMatrixes], labels,
                                        epochs=1, batch_size=batch_size,
                                        #callbacks=[early_stopping],
                                        #callbacks=[early_stopping, reduce_lr],
@@ -219,37 +230,48 @@ for i in range(100):
         if last_index > train_files_lenght:
             last_index = train_files_lenght
     print('last for loop index --> ' + str(i))
-    check = True
+
+
+    #EVALUATE
+
+    all_test_losses = []
+    all_test_accuracies = []
+
     start_index = 0
     last_index = batch_size
+    while True:
+        gc.collect()
+        files_in_batch = []
+        print('Evaluation with --> ' + test_folder)
+        for j in range(start_index, last_index):
+            files_in_batch.append(test_files[j])
+        iSeVCs, vulnLocMatrixes, labels = create_batch_test(files_in_batch)
+        loss, accuracy = vuldee_rhn_model.evaluate([iSeVCs, vulnLocMatrixes], labels, batch_size=batch_size)
 
+        all_test_losses.append(loss)
+        all_test_accuracies.append(accuracy)
 
-#EVALUATE
+        del files_in_batch, iSeVCs, vulnLocMatrixes, labels
+        gc.collect()
+        start_index = last_index
+        if start_index == test_files_lenght-1:
 
-all_test_losses = []
-all_test_accuracies = []
+            average_loss = np.mean(all_test_losses)
+            average_accuracy = np.mean(all_test_accuracies)
 
-test_files_lenght = len(os.listdir(test_folder))
-test_files = os.listdir(test_folder)
-random.shuffle(test_files)
-start_index = 0
-last_index = batch_size
-while True:
-    gc.collect()
-    files_in_batch = []
-    print('Evaluation with --> ' + test_folder)
-    for j in range(start_index, last_index):
-        files_in_batch.append(test_files[j])
-    iSeVCs, vulnLocMatrixes, labels = create_batch_test(files_in_batch)
-    loss, accuracy = vuldee_model.evaluate([iSeVCs, vulnLocMatrixes], labels, batch_size=batch_size)
+            print('==========================================================')
+            print('======================= EVALUATE =========================')
+            print('==========================================================')
+            print(f'Average Test Loss: {average_loss:.4f}')
+            print(f'Average Test Accuracy: {average_accuracy:.4f}')
+            print('==========================================================')
+            print('==========================================================')
+            print('==========================================================')
 
-    all_test_losses.append(loss)
-    all_test_accuracies.append(accuracy)
-
-    del files_in_batch, iSeVCs, vulnLocMatrixes, labels
-    gc.collect()
-    start_index = last_index
-    if start_index == test_files_lenght-1:
+            break
+        last_index += batch_size
+        if last_index > (test_files_lenght - 1):
+            last_index = test_files_lenght - 1
 
         average_loss = np.mean(all_test_losses)
         average_accuracy = np.mean(all_test_accuracies)
@@ -263,27 +285,9 @@ while True:
         print('==========================================================')
         print('==========================================================')
 
-        break
-    last_index += batch_size
-    if last_index > (test_files_lenght - 1):
-        last_index = test_files_lenght - 1
 
+        # Plot the results after training
+    plot(all_losses, all_accuracies, all_test_losses, all_test_accuracies, train_num, i)
 
-    average_loss = np.mean(all_test_losses)
-    average_accuracy = np.mean(all_test_accuracies)
-
-    print('==========================================================')
-    print('======================= EVALUATE =========================')
-    print('==========================================================')
-    print(f'Average Test Loss: {average_loss:.4f}')
-    print(f'Average Test Accuracy: {average_accuracy:.4f}')
-    print('==========================================================')
-    print('==========================================================')
-    print('==========================================================')
-
-
-    # Plot the results after training
-    plot(all_losses, all_accuracies, all_test_losses, all_test_accuracies, train_num, train_num)
-
-vuldee_model.save(f'/home/httpiego/PycharmProjects/VulDeeDiegator/trained_models/{train_num}/trained_model_{train_num}.keras')
+vuldee_rhn_model.save(f'/home/httpiego/PycharmProjects/VulDeeDiegator/trained_models/{train_num}/trained_model_{train_num}.keras')
 

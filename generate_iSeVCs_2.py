@@ -292,14 +292,14 @@ def main():
     for sSyVC in sSyVCs:
 
         #foreach candidate in sSyVCs
-        criteria = sSyVC
-        c_source_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/source.c'
+        criteria = 'strcpy'
+        c_source_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/bof/bof.c'
 
         path = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source' + criteria
 
         create_path(path)
 
-        llvm_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/prova'
+        llvm_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/bof/prova'
         generate_llvm = ['clang', '-S', '-emit-llvm', c_source_file, '-o', llvm_file]
         subprocess.run(generate_llvm, check=True)
 
@@ -325,7 +325,7 @@ def main():
         for line in final_iSeVC:
             print(str(line))
 
-        save = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/iSeVC'
+        save = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/bof/iSeVC'
 
         with open(save, 'w') as file:
             for line in file:

@@ -6,12 +6,12 @@ import os
 
 sequence_length = 2618  #295 average / #2618 longest
 
-embedding_dim = 64
+embedding_dim = 32
 
 TOKEN_PATTERN = r'[@%]?\w+\*+|\w+|[\[\]{}(),=*]|[<>]|[0-9]+|#\d+'
 
 fasttext = fasttext.load_model(
-    '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs_training_fasttext/fasttext_llvm_model_64.bin')
+    '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs_training_fasttext/fasttext_llvm_model_' + str(embedding_dim) + '.bin')
 
 
 def tokenize_line(llvm_code):
@@ -69,20 +69,20 @@ def vectorize_iSeVC(iSeVC):
     return np.array(vectorized_iSeVC)
 
 
-filepath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/iSeVCs_for_train_programs/PD_slices.txt'
+#filepath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/iSeVCs_for_train_programs/PD_slices.txt'
 
-#filepath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/iSeVCs_for_target_programs/PD_slices.txt'
+filepath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/iSeVCs_for_target_programs/PD_slices.txt'
 
-outputpath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/Training/'
+#outputpath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/' + str(embedding_dim) + '/Training/'
 
-#outputpath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/Testing/PD_slices/'
+outputpath = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/' + str(embedding_dim) + '/Testing/'
 
 with open(filepath, 'r') as file:
     print('Running')
     iSeVC = []
     line = file.readline()
     reading_llvm_code = False
-    iSeVC_counter = 85406
+    iSeVC_counter = 22020
     while line:
         pos = file.tell()
         next_line = file.readline()
