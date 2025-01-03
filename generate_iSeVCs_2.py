@@ -197,7 +197,7 @@ def fix_variables(iSeVC, starting_variable):
     i = 0
     while i < len(iSeVC):
         line = iSeVC[i]
-        if ':' in line:
+        if ':' in line and vars_dict_in_use != -1:
             for j in range(len(line)):
                 if line[j] == ':':
                         loop_variable = ''

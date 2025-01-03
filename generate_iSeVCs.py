@@ -313,7 +313,7 @@ def main():
 
     create_path(iSeVC_path)
 
-    with open(iSeVC_path + '/bof' + '_' + criteria + '_' + '_iSeVC', "w") as iSeVC:
+    with open(iSeVC_path + '/bof_' + criteria + '_iSeVC', "w") as iSeVC:
         for line in final_iSeVC:
             iSeVC.write(line.lstrip())
 
