@@ -6,7 +6,6 @@ def create_path(path):
     clang_command = ['mkdir', path]
 
     try:
-        # Run the clang command
         subprocess.run(clang_command, check=True)
         print(f"path has been successfully created")
     except subprocess.CalledProcessError as e:
@@ -23,14 +22,11 @@ def clean(input_file, output_file, function_name):
     for line in lines:
         if re.match(rf'^define.*@{function_name}\(', line.strip()):
             in_function = True
-        # If inside the function, append the line to the function body
         if in_function:
             function_body.append(line)
-            # Detect the end of the function
             if line.strip() == '}':
                 break
 
-    # Write the extracted function body to the output file
     with open(output_file, 'w') as file:
         for line in function_body:
             file.write(line)
@@ -116,10 +112,8 @@ def extract_func(input_file, function_name):
     for line in input_file:  #lines:
         if re.match(rf'^define.*@{function_name}\(', line.strip()):
             in_function = True
-        # If inside the function, append the line to the function body
         if in_function:
             function_body.append(line)
-            # Detect the end of the function
             if line.strip() == '}':
                 break
 
@@ -275,15 +269,14 @@ def fix_variables(iSeVC, starting_variable):
 
 def main():
 
-    #foreach candidate in sSyVCs
     criteria = 'strcpy'
-    c_source_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/bof/bof.c'
+    c_source_file = '/home/httpiego/PycharmProjects/AI-Analysis/TestPrograms/bof/bof.c'
 
-    path = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/bof/' + criteria
+    path = '/home/httpiego/PycharmProjects/AI-Analysis/TestPrograms/bof/' + criteria
 
     create_path(path)
 
-    llvm_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/bof/' + criteria + '_llvm'
+    llvm_file = '/home/httpiego/PycharmProjects/AI-Analysis/TestPrograms/bof/' + criteria + '_llvm'
     generate_llvm = ['clang', '-S', '-emit-llvm', c_source_file, '-o', llvm_file]
     subprocess.run(generate_llvm, check=True)
 
@@ -309,7 +302,7 @@ def main():
     for line in final_iSeVC:
         print(str(line))
 
-    iSeVC_path = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/bof/' + criteria + '/iSeVC'
+    iSeVC_path = '/home/httpiego/PycharmProjects/AI-Analysis/TestPrograms/bof/' + criteria + '/iSeVC'
 
     create_path(iSeVC_path)
 
