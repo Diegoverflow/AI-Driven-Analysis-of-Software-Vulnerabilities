@@ -97,11 +97,11 @@ def main(file_path):
     print("OTHERS")
     for tuple in sSyVCs_others:
         print(str(tuple))
-    file_path = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/sSyVCs'
+    file_path = '/home/httpiego/PycharmProjects/AI-Analysis/TestPrograms/source/sSyVCs'
     with open(file_path, 'wb') as f:
         pickle.dump(sSyVCs, f)
 
 
 if __name__ == "__main__":
-    source_file = "/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/source.c"
+    source_file = "/home/httpiego/PycharmProjects/AI-Analysis/TestPrograms/source/source.c"
     main(source_file)
