@@ -12,15 +12,13 @@ import numpy as np
 import matplotlib.pyplot as plt
 import random
 
-# Hyperparameters
-sequence_length = 2618  #295 average / #2618 longest
+sequence_length = 2618 
 embedding_dim = 64
 rnn_units = 32
 k_value = 1
 num_classes = 1
-batch_size = 128  # 500
+batch_size = 128 
 
-# Function to build the BRNN-vdl neural network
 
 def build_vuldee_model(sequence_length, embedding_dim, rnn_units, k_value, num_classes):
 
@@ -72,14 +70,14 @@ vuldee_model.compile(optimizer='adam', loss='binary_crossentropy', metrics=['acc
 vuldee_model.summary()
 
 
-train_folder = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/Training/'
-test_folder = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs/Vectorized/Testing/'
+train_folder = '/home/httpiego/PycharmProjects/AI-Analysis/iSeVCs/Vectorized/Training/'
+test_folder = '/home/httpiego/PycharmProjects/AI-Analysis/iSeVCs/Vectorized/Testing/'
 
 
 def plot(all_losses, all_accuracies,  all_test_losses, all_test_accuracies, train_num, plot_num):
     plt.figure(figsize=(12, 6))
 
-    # Plot loss
+    
     plt.subplot(1, 2, 1)
     plt.plot(all_losses, label='Training Loss', color='blue')
     plt.plot(all_test_losses, label='Testing Loss', color='orange')
@@ -88,7 +86,7 @@ def plot(all_losses, all_accuracies,  all_test_losses, all_test_accuracies, trai
     plt.ylabel('Loss')
     plt.legend()
 
-    # Plot accuracy
+    
     plt.subplot(1, 2, 2)
     plt.plot(all_accuracies, label='Training Accuracy', color='blue')
     plt.plot(all_test_accuracies, label='Testing Accuracy', color='orange')
@@ -99,7 +97,7 @@ def plot(all_losses, all_accuracies,  all_test_losses, all_test_accuracies, trai
 
     plt.tight_layout()
 
-    plt.savefig(f'/home/httpiego/PycharmProjects/VulDeeDiegator/trained_models/{train_num}/training_progress_{plot_num}.png')
+    plt.savefig(f'/home/httpiego/PycharmProjects/AI-Analysis/trained_models/{train_num}/training_progress_{plot_num}.png')
 
 def load_data_train(file_name):
     data = np.load(train_folder + file_name, allow_pickle=True)
@@ -177,7 +175,7 @@ random.shuffle(test_files)
 
 train_num = 1
 
-newpath = f'/home/httpiego/PycharmProjects/VulDeeDiegator/trained_models/{train_num}'
+newpath = f'/home/httpiego/PycharmProjects/AI-Analysis/trained_models/{train_num}'
 if not os.path.exists(newpath):
     os.makedirs(newpath)
 
@@ -198,7 +196,6 @@ for i in range(10):
             files_in_batch.append(train_files[j])
         iSeVCs, vulnLocMatrixes, labels = create_batch_train(files_in_batch)
 
-            #PROVA 2000/4000 EPOCHE - TOGLIERE EARLY STOPPING - TRAINING E VALIDAZIONE CLASSICHE
         tf.keras.backend.clear_session()
         print(f'start index - {start_index}')
         print(f'last index - {last_index}')
@@ -275,8 +272,7 @@ for i in range(10):
         print('==========================================================')
 
 
-        # Plot the results after training
     plot(all_losses, all_accuracies, all_test_losses, all_test_accuracies, train_num, i)
 
-vuldee_model.save(f'/home/httpiego/PycharmProjects/VulDeeDiegator/trained_models/{train_num}/trained_model_{train_num}.keras')
+vuldee_model.save(f'/home/httpiego/PycharmProjects/AI-Analysis/trained_models/{train_num}/trained_model_{train_num}.keras')
 
