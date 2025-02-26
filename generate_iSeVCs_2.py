@@ -7,7 +7,6 @@ def create_path(path):
     clang_command = ['mkdir', path]
 
     try:
-        # Run the clang command
         subprocess.run(clang_command, check=True)
         print(f"path has been successfully created")
     except subprocess.CalledProcessError as e:
@@ -24,14 +23,11 @@ def clean(input_file, output_file, function_name):
     for line in lines:
         if re.match(rf'^define.*@{function_name}\(', line.strip()):
             in_function = True
-        # If inside the function, append the line to the function body
         if in_function:
             function_body.append(line)
-            # Detect the end of the function
             if line.strip() == '}':
                 break
 
-    # Write the extracted function body to the output file
     with open(output_file, 'w') as file:
         for line in function_body:
             file.write(line)
@@ -103,7 +99,7 @@ def find_called_functions_in_llvm(file_content):  #llvm_file_path):
         return called_functions
 
     except Exception as e:
-        print(f"An error occurred: {str(e)}")
+        print(f"error: {str(e)}")
         return []
 
 
@@ -276,7 +272,7 @@ def fix_variables(iSeVC, starting_variable):
 
 def main():
 
-    sSyVCs_path = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source/sSyVCs'
+    sSyVCs_path = '/home/httpiego/PycharmProjects/AI-Analysis/TestPrograms/source/sSyVCs'
 
     with open(sSyVCs_path, 'rb') as f:
         sSyVCs_dict = pickle.load(f)
@@ -291,15 +287,14 @@ def main():
 
     for sSyVC in sSyVCs:
 
-        #foreach candidate in sSyVCs
         criteria = 'strcpy'
-        c_source_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/bof/bof.c'
+        c_source_file = '/home/httpiego/PycharmProjects/AI-Analysis/TestPrograms/bof/bof.c'
 
-        path = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/source' + criteria
+        path = '/home/httpiego/PycharmProjects/AI-Analysis/TestPrograms/source' + criteria
 
         create_path(path)
 
-        llvm_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/bof/prova'
+        llvm_file = '/home/httpiego/PycharmProjects/AI-Analysis/TestPrograms/bof/prova'
         generate_llvm = ['clang', '-S', '-emit-llvm', c_source_file, '-o', llvm_file]
         subprocess.run(generate_llvm, check=True)
 
@@ -325,7 +320,7 @@ def main():
         for line in final_iSeVC:
             print(str(line))
 
-        save = '/home/httpiego/PycharmProjects/VulDeeDiegator/TestPrograms/bof/iSeVC'
+        save = '/home/httpiego/PycharmProjects/AI-Analysis/TestPrograms/bof/iSeVC'
 
         with open(save, 'w') as file:
             for line in file:
