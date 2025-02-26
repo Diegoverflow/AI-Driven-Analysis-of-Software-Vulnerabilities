@@ -3,10 +3,9 @@ import re
 import fasttext
 
 
-main_folder = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs_training_fasttext/dataset'
+main_folder = '/home/httpiego/PycharmProjects/AI-Analysis/iSeVCs_training_fasttext/dataset'
 
 
-#TOKEN_PATTERN = r'[@%]?\w+|[\[\]{}(),=*]|[<>]|[0-9]+|#\d+'
 TOKEN_PATTERN = r'[@%]?\w+\*+|\w+|[\[\]{}(),=*]|[<>]|[0-9]+|#\d+'
 
 
@@ -52,7 +51,7 @@ def process_and_tokenize_files(main_folder, output_file):
 #exit()
 
 
-tokenized_corpus_file = '/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs_training_fasttext/tokenized_llvm_corpus.txt'
+tokenized_corpus_file = '/home/httpiego/PycharmProjects/AI-Analysis/iSeVCs_training_fasttext/tokenized_llvm_corpus.txt'
 
 
 process_and_tokenize_files(main_folder, tokenized_corpus_file)
@@ -64,7 +63,7 @@ model = fasttext.train_unsupervised(tokenized_corpus_file, model='skipgram', dim
 
 model.save_model('/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs_training_fasttext/fasttext_llvm_model_32.bin')
 
-#m = fasttext.load_model('/home/httpiego/PycharmProjects/VulDeeDiegator/iSeVCs_training_fasttext/fasttext_llvm_model_32.bin')
+#m = fasttext.load_model('/home/httpiego/PycharmProjects/AI-Analysis/iSeVCs_training_fasttext/fasttext_llvm_model_32.bin')
 
 
 vector_alloca = model.get_word_vector('alloca')
